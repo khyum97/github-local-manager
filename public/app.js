@@ -31,6 +31,7 @@ const btnLogout = document.getElementById('btn-logout');
 const repoList = document.getElementById('repo-list');
 const countTotal = document.getElementById('count-total');
 const searchInput = document.getElementById('search-input');
+const btnScanRepos = document.getElementById('btn-scan-repos');
 const tabAll = document.getElementById('tab-all');
 const tabConnected = document.getElementById('tab-connected');
 const tabUnconnected = document.getElementById('tab-unconnected');
@@ -536,6 +537,47 @@ tabUnconnected.addEventListener('click', () => {
   tabUnconnected.classList.add('active');
   state.activeFilter = 'unconnected';
   renderRepoList();
+});
+
+// Scan Local Repositories Click
+btnScanRepos.addEventListener('click', async () => {
+  if (!confirm('컴퓨터 내(C드라이브 일부, D드라이브, E드라이브)에서 GitHub과 연동된 로컬 저장소들을 검색해 자동으로 대시보드와 연결하시겠습니까?\n프로젝트 개수에 따라 10초~30초 가량 소요될 수 있습니다.')) return;
+  
+  showLoading('로컬 Git 저장소 탐색 및 연동 중...');
+  logToConsole('로컬 드라이브에서 GitHub 연동 저장소 검색을 시작합니다...', 'system');
+  
+  try {
+    const data = await apiFetch('/api/scan-repos', { method: 'POST' });
+    
+    logToConsole(`스캔 완료! 검색된 저장소 총합: ${data.totalCount}개 (새로 연동된 저장소: ${data.newCount}개)`, 'success');
+    if (data.newlyAdded && data.newlyAdded.length > 0) {
+      logToConsole('새로 발견되어 연동된 저장소 목록:', 'success');
+      data.newlyAdded.forEach(item => {
+        logToConsole(`- ${item.repo} -> ${item.path}`, 'success');
+      });
+    } else {
+      logToConsole('새롭게 발견된 저장소가 없습니다. 기존 연결 정보를 유지합니다.', 'system');
+    }
+    
+    // Refresh configuration state and repositories list
+    const configData = await apiFetch('/api/config');
+    state.folders = configData.folders || {};
+    state.nicknames = configData.nicknames || {};
+    
+    await fetchRepositories();
+    
+    // Refresh active repository details if one is selected
+    if (state.activeRepo) {
+      await selectRepository(state.activeRepo);
+    }
+    
+    alert(`스캔 완료!\n총 ${data.totalCount}개의 저장소가 연동되었습니다.\n(새로 추가됨: ${data.newCount}개)`);
+  } catch (err) {
+    logToConsole('로컬 저장소 자동 탐색 실패: ' + err.message, 'stderr');
+    alert('자동 탐색 중 오류가 발생했습니다. 하단 콘솔 로그를 확인해 주세요.');
+  } finally {
+    hideLoading();
+  }
 });
 
 // Disconnect local folder map

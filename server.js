@@ -233,6 +233,126 @@ app.post('/api/select-folder', (req, res) => {
   });
 });
 
+// Scan local drives for GitHub repositories and automatically map them
+app.post('/api/scan-repos', (req, res) => {
+  const IGNORE_DIRS = new Set([
+    'node_modules', 'venv', '.venv', 'AppData', 'Local Settings', 'Application Data',
+    'System Volume Information', '$RECYCLE.BIN', '$Recycle.Bin', 'Windows', 'Program Files',
+    'Program Files (x86)', 'pinokio', 'SillyTavern', 'stable-diffusion-webui-master',
+    'models', 'Ollama', 'Local', 'Roaming', 'cache', '.cache', 'tmp', 'temp',
+    'Downloads', 'Pictures', 'Music', 'Videos', 'Saved Games', 'Searches', 'Links',
+    '.gemini', '.git', 'local_llm', 'local_llm_agent', 'python', 'OPENCLAW',
+    'openllmvtuber', 'subllm', 'wan2gp 설정백업'
+  ]);
+
+  const roots = [
+    'D:\\',
+    'E:\\',
+    'C:\\Users\\yumji\\Documents',
+    'C:\\Users\\yumji\\Desktop'
+  ];
+
+  const foundRepos = [];
+
+  function scanDirectory(dir, depth = 0) {
+    if (depth > 3) return; // Limit depth to 3 for fast scanning
+    
+    let files;
+    try {
+      files = fs.readdirSync(dir);
+    } catch (e) {
+      return; // Ignore access permission errors
+    }
+
+    // 1. Check if this is a git repository
+    if (files.includes('.git')) {
+      const gitPath = path.join(dir, '.git');
+      const configPath = path.join(gitPath, 'config');
+      if (fs.existsSync(configPath)) {
+        try {
+          const configText = fs.readFileSync(configPath, 'utf8');
+          const match = configText.match(/url\s*=\s*([^\s\r\n]+)/);
+          if (match) {
+            const url = match[1].trim();
+            let repoPath = '';
+            if (url.includes('github.com/')) {
+              repoPath = url.split('github.com/')[1];
+            } else if (url.includes('github.com:')) {
+              repoPath = url.split('github.com:')[1];
+            }
+            if (repoPath) {
+              if (repoPath.endsWith('.git')) {
+                repoPath = repoPath.slice(0, -4);
+              }
+              repoPath = repoPath.trim();
+              
+              const parts = repoPath.split('/');
+              if (parts.length >= 2) {
+                const owner = parts[parts.length - 2];
+                const repo = parts[parts.length - 1];
+                const cleanRepo = `${owner}/${repo}`;
+                foundRepos.push({
+                  path: dir,
+                  url: url,
+                  repo: cleanRepo
+                });
+                return; // Stop searching child directories for this path
+              }
+            }
+          }
+        } catch (e) {}
+      }
+    }
+
+    // 2. Scan subdirectory
+    for (const file of files) {
+      if (IGNORE_DIRS.has(file)) continue;
+      if (file.startsWith('.')) continue;
+
+      const fullPath = path.join(dir, file);
+      try {
+        const stat = fs.statSync(fullPath);
+        if (stat.isDirectory()) {
+          scanDirectory(fullPath, depth + 1);
+        }
+      } catch (e) {}
+    }
+  }
+
+  try {
+    for (const root of roots) {
+      if (fs.existsSync(root)) {
+        scanDirectory(root);
+      }
+    }
+
+    const config = readConfig();
+    const newlyAdded = [];
+
+    foundRepos.forEach(item => {
+      if (!config.folders[item.repo]) {
+        newlyAdded.push(item);
+      }
+      config.folders[item.repo] = item.path;
+      if (!config.nicknames[item.repo]) {
+        config.nicknames[item.repo] = path.basename(item.path);
+      }
+    });
+
+    writeConfig(config);
+
+    res.json({
+      success: true,
+      totalCount: Object.keys(config.folders).length,
+      newCount: newlyAdded.length,
+      newlyAdded: newlyAdded.map(i => ({ repo: i.repo, path: i.path })),
+      folders: config.folders
+    });
+  } catch (err) {
+    res.status(500).json({ error: '로컬 자동 스캔 실패: ' + err.message });
+  }
+});
+
 // Map a local folder to a repository manually
 app.post('/api/connect-folder', (req, res) => {
   const { repoFullName, localPath } = req.body;
