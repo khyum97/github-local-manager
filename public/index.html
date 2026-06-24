@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GitHub Local Manager</title>
+  <!-- Google Fonts Outfit & Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=1.1">
+</head>
+<body>
+
+  <!-- Loading Overlay -->
+  <div id="loading-overlay" class="overlay hidden">
+    <div class="spinner-container">
+      <div class="spinner"></div>
+      <p id="loading-text">GitHub과 동기화 중...</p>
+    </div>
+  </div>
+
+  <!-- Main Container -->
+  <div class="app-container">
+    
+    <!-- Login Screen (Visible if not authenticated) -->
+    <div id="login-screen" class="login-wrapper">
+      <div class="login-card">
+        <div class="logo-area">
+          <svg class="git-logo" viewBox="0 0 16 16" width="48" height="48" fill="currentColor">
+            <path fill-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path>
+          </svg>
+          <h1>GitHub Local Manager</h1>
+          <p>로컬 폴더와 GitHub 저장소를 시각적으로 관리하고 손쉽게 동기화하세요.</p>
+        </div>
+        
+        <form id="login-form">
+          <div class="input-group">
+            <label for="pat-token">GitHub Personal Access Token (PAT)</label>
+            <input type="password" id="pat-token" placeholder="ghp_..." required autocomplete="current-password">
+            <div class="token-helper">
+              <a href="https://github.com/settings/tokens/new?scopes=repo,user" target="_blank" id="btn-generate-token">
+                토큰 발급하러 가기 ↗
+              </a>
+              <span>(필수 권한: <code>repo</code>, <code>user</code>)</span>
+            </div>
+          </div>
+          <button type="submit" id="btn-login-submit" class="btn btn-primary">GitHub 연동하기</button>
+        </form>
+        
+        <div id="login-error" class="error-msg hidden"></div>
+      </div>
+    </div>
+
+    <!-- Main Dashboard Screen (Visible if authenticated) -->
+    <div id="dashboard-screen" class="dashboard-wrapper hidden">
+      
+      <!-- Header -->
+      <header class="app-header">
+        <div class="header-logo">
+          <svg class="header-icon" viewBox="0 0 16 16" width="24" height="24" fill="currentColor">
+            <path fill-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path>
+          </svg>
+          <span class="logo-text">Git Manager</span>
+        </div>
+        
+        <div class="header-actions">
+          <div id="user-profile" class="user-profile-badge">
+            <img id="user-avatar" src="" alt="Avatar">
+            <span id="user-name">GitHub User</span>
+            <button id="btn-logout" class="btn btn-secondary btn-sm">로그아웃</button>
+          </div>
+        </div>
+      </header>
+
+      <!-- Main Layout Grid -->
+      <div class="dashboard-grid">
+        
+        <!-- Left Panel: Repository List -->
+        <section class="panel repo-panel">
+          <div class="panel-header">
+            <h2>내 GitHub 저장소</h2>
+            <div class="repo-stats">
+              <span id="count-total">0 개의 저장소</span>
+            </div>
+          </div>
+          
+          <!-- Filter Controls -->
+          <div class="filter-controls">
+            <div class="search-box">
+              <input type="text" id="search-input" placeholder="저장소 이름 검색...">
+            </div>
+            <div class="tab-filters">
+              <button id="tab-all" class="tab-btn active">전체</button>
+              <button id="tab-connected" class="tab-btn">연결됨 (로컬)</button>
+              <button id="tab-unconnected" class="tab-btn">미연결</button>
+            </div>
+          </div>
+
+          <!-- Repository Grid Container -->
+          <div id="repo-list" class="repo-list-container">
+            <!-- Repo Cards will be injected here dynamically -->
+            <div class="empty-state">저장소를 불러오는 중...</div>
+          </div>
+        </section>
+
+        <!-- Right Panel: Git Operations Details -->
+        <section class="panel git-ops-panel">
+          <div id="empty-details-view" class="details-empty-state">
+            <div class="icon-bubble">
+              <svg viewBox="0 0 16 16" width="32" height="32" fill="currentColor">
+                <path d="M2.5 1.75v11.5c0 .138.112.25.25.25h3.17a.75.75 0 0 1 0 1.5H2.75A1.75 1.75 0 0 1 1 13.25V1.75C1 .784 1.784 0 2.75 0h8.5C12.216 0 13 .784 13 1.75v5a.75.75 0 0 1-1.5 0v-5a.25.25 0 0 0-.25-.25H8.75V4.5a.75.75 0 0 1-.75.75H2.5v-3.5zM7.25 1.5H2.75a.25.25 0 0 0-.25.25v2h4.5v-2.25a.25.25 0 0 0-.25-.25z"></path>
+                <path d="M11.5 16a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9zm1.68-6.22a.75.75 0 1 1 1.06 1.06l-2.25 2.25a.75.75 0 0 1-1.06 0l-1.25-1.25a.75.75 0 1 1 1.06-1.06l.72.72 1.72-1.72z"></path>
+              </svg>
+            </div>
+            <h3>저장소를 선택하세요</h3>
+            <p>목록에서 저장소를 선택하여 Git 상태를 확인하고 풀/푸시 작업을 진행할 수 있습니다.</p>
+          </div>
+
+          <div id="details-view" class="details-content hidden">
+            <div class="details-header">
+              <div class="repo-title-wrapper">
+                <h3 id="active-repo-name">Repository Name</h3>
+                <span id="active-repo-badge" class="badge">Public</span>
+              </div>
+              <button id="btn-disconnect" class="btn btn-danger btn-sm" title="로컬 연결 해제">연결 해제</button>
+            </div>
+
+            <!-- Path display or Setup clone area -->
+            <div id="path-status-card" class="status-card">
+              <div class="status-row">
+                <span class="label">로컬 폴더 경로</span>
+                <span id="active-local-path" class="path-text">설정되지 않음</span>
+              </div>
+            </div>
+
+            <!-- Nickname configuration card -->
+            <div class="status-card" id="nickname-card">
+              <div class="status-row" style="gap: 12px; display: flex; align-items: center;">
+                <span class="label" style="min-width: 90px;">저장소 별명</span>
+                <input type="text" id="input-nickname" placeholder="별명(닉네임)을 입력하세요">
+                <button id="btn-save-nickname" class="btn btn-secondary btn-sm">별명 저장</button>
+              </div>
+            </div>
+
+            <!-- Setup operations (Clone or Manual connect) -->
+            <div id="git-setup-section" class="setup-section hidden">
+              <h4>로컬 폴더 연결이 필요합니다</h4>
+              <p class="description">이 저장소를 로컬 폴더에 클론하거나, 이미 클론된 폴더가 있다면 수동으로 연결해 주세요.</p>
+              
+              <div class="setup-actions">
+                <button id="btn-action-clone" class="btn btn-primary">
+                  <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor">
+                    <path d="M2 2.5A2.5 2.5 0 0 1 4.5 0h8.75a.75.75 0 0 1 .75.75v12.5a.75.75 0 0 1-.75.75h-2.5a.75.75 0 1 1 0-1.5h1.75v-2h-8a1 1 0 0 0-.714 1.7.75.75 0 1 1-1.072 1.05A2.495 2.495 0 0 1 2 11.5v-9zm10.5-1v9h-8c-.356 0-.694.074-1 .208V2.5a1 1 0 0 1 1-1h8z"></path>
+                  </svg>
+                  새 폴더에 깃 클론 (Clone)
+                </button>
+                <button id="btn-action-connect" class="btn btn-secondary">
+                  <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor">
+                    <path d="M1.75 1A1.75 1.75 0 0 0 0 2.75v10.5C0 14.216.784 15 1.75 15h12.5A1.75 1.75 0 0 0 16 13.25v-8.5A1.75 1.75 0 0 0 14.25 3h-5.71l-.97-1.455A1.75 1.75 0 0 0 6.13 1H1.75zM1.5 2.75a.25.25 0 0 1 .25-.25h4.38c.096 0 .186.05.237.132L7.56 4.382A1.75 1.75 0 0 0 9.02 5h5.23a.25.25 0 0 1 .25.25v8a.25.25 0 0 1-.25.25H1.75a.25.25 0 0 1-.25-.25v-10.5z"></path>
+                  </svg>
+                  기존 로컬 폴더에 연결
+                </button>
+              </div>
+            </div>
+
+            <!-- Active Git Status Area -->
+            <div id="git-ops-section" class="ops-section hidden">
+              
+              <!-- Branch and Ahead/Behind Status -->
+              <div class="git-status-summary">
+                <div class="status-item">
+                  <span class="status-label">현재 브랜치</span>
+                  <div class="status-value">
+                    <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" class="branch-icon">
+                      <path fill-rule="evenodd" d="M11.75 2.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5zm-2.25.75a2.25 2.25 0 1 1 3 2.122V6A2.5 2.5 0 0 1 10 8.5H6a1 1 0 0 0-1 1v1.128a2.251 2.251 0 1 1-1.5 0V5.372a2.25 2.25 0 1 1 1.5 0v1.628A2.5 2.5 0 0 1 7.5 4.5h2V3.25zM11 6a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zM3.5 1.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5zm0 11a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5z"></path>
+                    </svg>
+                    <span id="git-branch-name">-</span>
+                  </div>
+                </div>
+
+                <div class="status-item">
+                  <span class="status-label">원격 동기화 상태</span>
+                  <div class="status-value" id="git-sync-state">
+                    동기화 확인 중...
+                  </div>
+                </div>
+              </div>
+
+              <!-- Diverged Reconciliation Alert (융합 필요 시 노출) -->
+              <div id="diverged-alert" class="reconcile-card hidden">
+                <div class="reconcile-card-header">
+                  <svg viewBox="0 0 16 16" width="18" height="18" fill="currentColor" class="warning-icon">
+                    <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm.93-11.412-1 7.424a.697.697 0 0 1-1.38 0l-1-7.424a.7.7 0 1 1 1.39-.187L7.5 10.158l.536-3.982a.7.7 0 1 1 1.394.187zM8 13.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"></path>
+                  </svg>
+                  <h4>브랜치 병합/융합 필요</h4>
+                </div>
+                <p>로컬과 깃허브의 커밋 이력이 다릅니다(Diverged). 아래 방법 중 하나를 선택해 합쳐주세요.</p>
+                <div class="reconcile-buttons">
+                  <button id="btn-reconcile-merge" class="btn btn-warning btn-sm">원격 변경 병합 (Merge)</button>
+                  <button id="btn-reconcile-rebase" class="btn btn-warning-outline btn-sm">원격 기준 리베이스 (Rebase)</button>
+                  <button id="btn-reconcile-force" class="btn btn-danger-outline btn-sm">로컬 내용 강제 덮어쓰기 (Force Push)</button>
+                  <button id="btn-reconcile-reset" class="btn btn-danger btn-sm">로컬 버리고 원격 받아오기 (Reset Local)</button>
+                </div>
+                <!-- Abort action (only visible when in conflict state potentially) -->
+                <div id="abort-action-container" class="hidden">
+                  <button id="btn-abort-rebase" class="btn btn-danger btn-sm">리베이스 취소 (--abort)</button>
+                  <button id="btn-abort-merge" class="btn btn-danger btn-sm">병합 취소 (--abort)</button>
+                </div>
+              </div>
+
+              <!-- Uncommitted changes list -->
+              <div class="changes-list-container">
+                <h4 class="sub-section-title">수정된 파일 목록 (<span id="changes-count">0</span>)</h4>
+                <div id="changes-list" class="changes-list">
+                  <!-- File names will be listed here -->
+                  <div class="clean-state">변경된 파일이 없습니다. 로컬 폴더에서 손으로 파일을 수정해 보세요!</div>
+                </div>
+              </div>
+
+              <!-- Push / Pull Forms -->
+              <div class="git-actions-card">
+                <div class="tab-header">
+                  <button id="action-tab-push" class="action-tab active">원격에 올리기 (Push / Commit)</button>
+                  <button id="action-tab-pull" class="action-tab">원격에서 가져오기 (Pull / Fetch)</button>
+                </div>
+
+                <div class="tab-body">
+                  <!-- Push Panel -->
+                  <div id="action-panel-push" class="action-panel">
+                    <p class="section-desc">로컬 변경사항이 있는 경우 커밋 후 원격 저장소에 올립니다.</p>
+                    
+                    <div class="form-group">
+                      <label class="checkbox-container">
+                        <input type="checkbox" id="chk-auto-commit" checked>
+                        <span class="checkmark"></span>
+                        자동 커밋 메시지 사용 (수동 입력 생략)
+                      </label>
+                    </div>
+
+                    <div class="form-group" id="commit-msg-group" style="display: none;">
+                      <label for="input-commit-msg">커밋 메시지</label>
+                      <input type="text" id="input-commit-msg" placeholder="변경 내용을 설명해 주세요.">
+                    </div>
+
+                    <div class="btn-group-row">
+                      <button id="btn-git-push" class="btn btn-primary">커밋 및 푸시 실행</button>
+                      <button id="btn-git-push-only" class="btn btn-secondary">단순 푸시만 실행 (git push)</button>
+                    </div>
+                  </div>
+
+                  <!-- Pull Panel -->
+                  <div id="action-panel-pull" class="action-panel hidden">
+                    <p class="section-desc">원격 저장소(GitHub)의 변경사항을 로컬로 가져와 업데이트합니다.</p>
+                    <button id="btn-git-pull" class="btn btn-primary">풀 (git pull) 실행</button>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+        </section>
+
+      </div>
+
+      <!-- Footer: Debug Console -->
+      <footer class="console-footer">
+        <div class="console-header">
+          <div class="console-title">
+            <span class="terminal-dot red"></span>
+            <span class="terminal-dot yellow"></span>
+            <span class="terminal-dot green"></span>
+            <h4>디버깅 및 실행 로그 콘솔 (Terminal Logs)</h4>
+          </div>
+          <button id="btn-clear-console" class="btn btn-console-clear">로그 지우기</button>
+        </div>
+        <div id="console-logs" class="console-body">
+          <div class="console-line system">[System] GitHub Local Manager가 시작되었습니다. 로그가 여기에 실시간으로 기록됩니다.</div>
+        </div>
+      </footer>
+
+    </div>
+
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

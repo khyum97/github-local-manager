@@ -1,0 +1,12 @@
+{
+  "name": "github-local-manager",
+  "version": "1.0.0",
+  "description": "Local web-based Git client and GitHub repository manager",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  }
+}
