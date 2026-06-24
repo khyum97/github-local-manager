@@ -364,7 +364,9 @@ app.post('/api/open-folder', (req, res) => {
   const openCmd = `explorer.exe "${path.resolve(localPath)}"`;
   
   exec(openCmd, (error) => {
-    if (error) {
+    // explorer.exe typically returns exit code 1 on success because it spawns a background thread.
+    // Therefore, we ignore error if error.code is 1.
+    if (error && error.code !== 1) {
       return res.status(500).json({ error: '폴더 열기 실패: ' + error.message });
     }
     res.json({ success: true });
